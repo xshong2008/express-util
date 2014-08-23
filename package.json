@@ -1,0 +1,10 @@
+{
+	"name": "express-util",
+	"version": "0.0.1",
+	"private": true,
+	"keyword": "exrepss,util,dao,mysql,uuid",
+	"dependencies": {
+		"mysql": "*",
+		"node-uuid": "*"
+	}
+}
