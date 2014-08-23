@@ -1,10 +1,20 @@
 {
 	"name": "express-util",
-	"version": "0.0.1",
+	"version": "1.0.1",
 	"private": true,
-	"keyword": "exrepss,util,dao,mysql,uuid",
+	"main": "index.js",
+	"homepage": "https://github.com/xshong2008/express-util/",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/xshong2008/express-util"
+	},
+	"keyword": ["exrepss", "util", "dao", "mysql", "uuid"],
 	"dependencies": {
 		"mysql": "*",
 		"node-uuid": "*"
+	},
+	"author": {
+		"name": "xshong2008",
+		"email": "cheerwe@126.com"
 	}
 }
