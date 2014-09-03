@@ -232,11 +232,14 @@ Asyn.prototype.run = function() {
 
 	if (item) {
 		var callback = (function(callback, err, data) {
+			var ret = true;
 			if (callback) {
-				callback(err, data);
+				ret = callback(err, data);
 			}
 			this.isRunning = false;
-			this.run();
+			if (ret !== false) {
+				this.run();
+			}
 		}).bind(this, item.callback);
 
 		item.fn(callback);
