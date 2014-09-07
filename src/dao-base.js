@@ -20,6 +20,52 @@ var DAO = function(config) {
 
 var daoPrototype = {
 	dbHelper: dbHelper,
+	newUUID: function() {
+		return nodeUUID.v1();
+	},
+	doTransaction: function(sqlList, callback) {
+		dbHelper.beginTransaction(function(err) {
+			if (err) {
+				throw err;
+			}
+			var index = 0,
+				len = sqlList.length,
+				runSql = function() {
+					var item = sqlList[index],
+						sql = '',
+						data = [];
+					if (typeof(item) == 'object') {
+						data = item.data;
+						sql = item.sql;
+					} else {
+						sql = item;
+					}
+					dbHelper.query(sql, data, function(err, ret) {
+						index++;
+						if (err) {
+							dbHelper.rollback(function() {
+								throw err;
+							});
+						}
+						if (index == len) {
+							dbHelper.commit(function(err) {
+								if (err) {
+									dbHelper.rollback(function() {
+										throw err;
+									});
+								} else {
+									callback();
+								}
+							});
+						} else {
+							runSql();
+						}
+					});
+				};
+
+			runSql();
+		});
+	},
 	getConditionStr: function(condition) {
 		if (!condition) {
 			return '';
@@ -208,13 +254,13 @@ var daoPrototype = {
 
 Util.override(DAO, daoPrototype);
 
-DAO.extend = function(exconfig) {
+var extend = function(superclass, exconfig) {
 	var fn = function(config) {
 		Util.apply(this, config);
 	};
-	fn.prototype = Util.apply({}, daoPrototype, exconfig);
-
-	fn.superclass = daoPrototype;
+	var sp = superclass.prototype;
+	fn.prototype = Util.apply({}, sp, exconfig);
+	fn.superclass = sp;
 
 	var _ins = null;
 	fn.getInstance = function() {
@@ -222,8 +268,15 @@ DAO.extend = function(exconfig) {
 			_ins = new fn();
 		}
 		return _ins;
-	}
+	};
+	fn.extend = function(exconfig) {
+		return extend(fn, exconfig);
+	};
 	return fn;
+};
+
+DAO.extend = function(exconfig) {
+	return extend(DAO, exconfig);
 };
 
 module.exports = DAO;

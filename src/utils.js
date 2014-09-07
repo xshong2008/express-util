@@ -204,6 +204,11 @@ var Util = {
 		}
 		return format;
 	},
+	formatNum: function(num, format) {
+		num += '';
+		format = format || '0000';
+		return format.substr(0, format.length - num.length) + num;
+	},
 	MD5: function(data) {
 		var _encrymd5 = require('crypto').createHash('md5');
 		_encrymd5.update(data);
@@ -232,14 +237,11 @@ Asyn.prototype.run = function() {
 
 	if (item) {
 		var callback = (function(callback, err, data) {
-			var ret = true;
 			if (callback) {
-				ret = callback(err, data);
+				callback(err, data);
 			}
 			this.isRunning = false;
-			if (ret !== false) {
-				this.run();
-			}
+			this.run();
 		}).bind(this, item.callback);
 
 		item.fn(callback);
