@@ -148,7 +148,7 @@ var daoPrototype = {
 		if (config.pageSize) {
 			config.pageIndex = config.pageIndex || 0;
 			var start = config.pageSize * config.pageIndex,
-				end = (config.pageIndex + 1) * config.pageSize;
+				end = config.pageSize;
 
 			pageStr = ['LIMIT', ' ', start, ',', end].join('');
 		}
