@@ -31,10 +31,11 @@ var helper = {
 		try {
 			var config = this.getReqMode(req, ['orderField', 'orderDir', 'pageSize', 'pageIndex']);
 			config.condition = req.condition; //这两项数据需要自行组织
+			config.orderby = {};
 			if (config.orderField) {
-				config.orderby = {};
 				config.orderby[config.orderField] = config.orderDir || 'asc';
-			}
+			}			
+			Util.apply(config.orderby, req.orderby);
 
 			dao.getPageList(config, function(err, rows, total) {
 				if (err) {
