@@ -79,7 +79,7 @@ var Util = {
 			var sour = arguments[i];
 
 			for (var s in sour) {
-				if (obj[s] !== undefined) {
+				if (obj[s] === undefined) {
 					obj[s] = sour[s];
 				}
 			}
@@ -218,6 +218,7 @@ var Util = {
 
 var Asyn = function() {
 	this.list = [];
+	this._endItem = null;
 	this.isRunning = false;
 };
 Asyn.prototype.then = function(fn, callback) {
@@ -235,14 +236,36 @@ Asyn.prototype.run = function() {
 	this.isRunning = true;
 	var item = this.list.shift();
 
+	this._runItem(item);
+};
+Asyn.prototype.end = function(fn, callback) {
+	this._endItem = {
+		fn: fn,
+		callback: callback
+	};
+	return this;
+};
+Asyn.prototype._runEnd = function() {
+	this._runItem(this._endItem, true);
+};
+Asyn.prototype._runItem = function(item, isEnd) {
 	if (item) {
-		var callback = (function(callback, err, data) {
+		var callback = (function(callback, isEnd, err, data) {
+			var ret = true;
 			if (callback) {
-				callback(err, data);
+				ret = callback(err, data);
 			}
 			this.isRunning = false;
-			this.run();
-		}).bind(this, item.callback);
+
+			if (!isEnd) {
+				//如果上一个callback的执行结果不是false，则继续执行下一个异步
+				if (ret !== false) {
+					this.run();
+				} else {
+					this._runEnd();
+				}
+			}
+		}).bind(this, item.callback, isEnd);
 
 		item.fn(callback);
 	} else {
