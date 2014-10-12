@@ -117,7 +117,7 @@ var daoPrototype = {
 			orderby = null;
 		}
 
-		var sql = [Util.format(SQL.SELECT, this.tableName)];
+		var sql = [Util.format(SQL.SELECT, this.viewName || this.tableName)];
 		sql.push(this.getConditionStr(condition)),
 		sql.push(this.getOrderByStr(orderby));
 
