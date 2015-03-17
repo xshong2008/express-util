@@ -10,7 +10,7 @@ var Util = require('./utils'),
 		DELETE_IN: 'delete from {0} where id in (?)',
 		UPDATE: 'update ?? set ? where id=?',
 		GETMODE: 'select * from ?? where id=?',
-		COUNT: 'select count(id) as total from {0}'
+		COUNT: 'select count({0}) as total from {1}'
 	};
 
 
@@ -20,11 +20,13 @@ var DAO = function(config) {
 
 var daoPrototype = {
 	dbHelper: dbHelper,
+	pkField: 'id',
 	newUUID: function() {
 		return nodeUUID.v1();
 	},
 	doTransaction: function(sqlList, callback) {
-		dbHelper.beginTransaction(function(err) {
+		var conn = dbHelper.getConnection();
+		conn.beginTransaction(function(err) {
 			if (err) {
 				throw err;
 			}
@@ -40,17 +42,17 @@ var daoPrototype = {
 					} else {
 						sql = item;
 					}
-					dbHelper.query(sql, data, function(err, ret) {
+					conn.query(sql, data, function(err, ret) {
 						index++;
 						if (err) {
-							dbHelper.rollback(function() {
+							conn.rollback(function() {
 								throw err;
 							});
 						}
 						if (index == len) {
-							dbHelper.commit(function(err) {
+							conn.commit(function(err) {
 								if (err) {
-									dbHelper.rollback(function() {
+									conn.rollback(function() {
 										throw err;
 									});
 								} else {
@@ -119,10 +121,13 @@ var daoPrototype = {
 
 		var sql = [Util.format(SQL.SELECT, this.viewName || this.tableName)];
 		sql.push(this.getConditionStr(condition)),
-		sql.push(this.getOrderByStr(orderby));
+			sql.push(this.getOrderByStr(orderby));
 
-		var query = dbHelper.query(sql.join(' '), callback);
-		console.log(query.sql);
+		var conn = dbHelper.getConnection(),
+			query = conn.query(sql.join(' '), callback);
+
+		dbHelper.endConnection(conn, query);
+		// console.log(query.sql);
 	},
 	/**
 	*@param config
@@ -162,14 +167,18 @@ var daoPrototype = {
 		sqlList.push(selectSql);
 		sqlList.push(countSql);
 
-		dbHelper.query(sqlList.join('; '), function(err, rets) {
-			if (err || rets.length != 2) {
-				callback(err, null);
-			} else {
-				callback(err, rets[0], rets[1][0].total);
-			}
-		});
-		console.log(sqlList);
+		var conn = dbHelper.getConnection(),
+			query = conn.query(sqlList.join('; '), function(err, rets) {
+				if (err || rets.length != 2) {
+					callback(err, null);
+				} else {
+					callback(err, rets[0], rets[1][0].total);
+				}
+			});
+
+		dbHelper.endConnection(conn, query);
+
+		// console.log(sqlList);
 	},
 	save: function(mode, callback) {
 		if (mode.id) {
@@ -181,74 +190,86 @@ var daoPrototype = {
 	add: function(mode, callback) {
 		mode.id = nodeUUID.v1();
 
-		var query = dbHelper.query(SQL.INSERT, [this.tableName, mode], function(err, ret) {
-			if (callback) {
-				if (err) {
-					callback(err, false);
-					console.log(err);
-				} else {
-					callback(err, true);
+		var conn = dbHelper.getConnection(),
+			query = conn.query(SQL.INSERT, [this.tableName, mode], function(err, ret) {
+				if (callback) {
+					if (err) {
+						callback(err, false);
+						console.log(err);
+					} else {
+						callback(err, true);
+					}
 				}
-			}
-		});
+			});
+		dbHelper.endConnection(conn, query);
 
-		console.log(query.sql);
+		//		console.log(query.sql);
 	},
 	edit: function(mode, callback) {
-		var query = dbHelper.query(SQL.UPDATE, [this.tableName, mode, mode.id], function(err, ret) {
-			if (callback) {
-				if (err) {
-					callback(err, false);
-					console.log(err);
-				} else {
-					callback(err, true);
+		var conn = dbHelper.getConnection(),
+			query = conn.query(SQL.UPDATE, [this.tableName, mode, mode.id], function(err, ret) {
+				if (callback) {
+					if (err) {
+						callback(err, false);
+						console.log(err);
+					} else {
+						callback(err, true);
+					}
 				}
-			}
-		});
+			});
 
-		console.log(query.sql);
+		dbHelper.endConnection(conn, query);
+
+		//		console.log(query.sql);
 	},
 	getMode: function(id, callback) {
-		var query = dbHelper.query(SQL.GETMODE, [this.viewName || this.tableName, id], function(err, ret) {
-			if (callback) {
-				var mode = undefined;
-				if (!err && ret.length) {
-					mode = ret[0];
+		var conn = dbHelper.getConnection(),
+			query = conn.query(SQL.GETMODE, [this.viewName || this.tableName, id], function(err, ret) {
+				if (callback) {
+					var mode = undefined;
+					if (!err && ret.length) {
+						mode = ret[0];
+					}
+					callback(err, mode);
 				}
-				callback(err, mode);
-			}
-		});
-		console.log(query.sql);
+			});
+
+		dbHelper.endConnection(conn, query);
+		// console.log(query.sql);
 	},
 	del: function(ids, callback) {
-		var sql = Util.format(SQL.DELETE_IN, this.tableName);
-		var query = dbHelper.query(sql, [ids.split(',')], function(err, ret) {
-			if (callback) {
-				if (err) {
-					callback(err, false);
-					console.log(err);
-				} else {
-					callback(err, true);
+		var sql = Util.format(SQL.DELETE_IN, this.tableName),
+			conn = dbHelper.getConnection(),
+			query = conn.query(sql, [ids.split(',')], function(err, ret) {
+				if (callback) {
+					if (err) {
+						callback(err, false);
+						console.log(err);
+					} else {
+						callback(err, true);
+					}
 				}
-			}
-		});
-		console.log(query.sql);
+			});
+		dbHelper.endConnection(conn, query);
+		// console.log(query.sql);
 	},
 	getListIn: function(ids, callback) {
 		var sql = Util.format(SQL.SELECT_IN, this.tableName);
 		if (!nodeUtil.isArray(ids)) {
 			ids = ids.split(',');
 		}
-		var query = dbHelper.query(sql, [ids], function(err, ret) {
-			if (callback) {
-				if (err) {
-					callback(err);
-				} else {
-					callback(err, ret);
+		var conn = dbHelper.getConnection(),
+			query = conn.query(sql, [ids], function(err, ret) {
+				if (callback) {
+					if (err) {
+						callback(err);
+					} else {
+						callback(err, ret);
+					}
 				}
-			}
-		});
-		console.log(query.sql);
+			});
+		dbHelper.endConnection(conn, query);
+		// console.log(query.sql);
 	}
 }
 

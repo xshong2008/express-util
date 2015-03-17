@@ -3,7 +3,7 @@ var Util = require('./utils'),
 
 
 var helper = {
-	getReqMode: function(req, mode) {
+	getReqMode: function(req, mode, defMode) {
 		var data = {};
 		if (nodeUtil.isArray(mode)) {
 			mode.forEach(function(key) {
@@ -13,6 +13,14 @@ var helper = {
 			for (var key in mode) {
 				var name = mode[key] || key;
 				data[key] = req.param(name) || '';
+			}
+		}
+
+		if (defMode) {
+			for (var key in defMode) {
+				if (data[key] === undefined) {
+					data[key] = defMode[key];
+				}
 			}
 		}
 
@@ -34,7 +42,7 @@ var helper = {
 			config.orderby = {};
 			if (config.orderField) {
 				config.orderby[config.orderField] = config.orderDir || 'asc';
-			}			
+			}
 			Util.apply(config.orderby, req.orderby);
 
 			dao.getPageList(config, function(err, rows, total) {
