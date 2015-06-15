@@ -1,16 +1,17 @@
 var Util = require('./utils'),
+	mysql = require('mysql'),
 	dbHelper = require('./db-helper'),
 	nodeUtil = require('util'),
 	nodeUUID = require('node-uuid'),
 	SQL = {
 		SELECT: 'select * from {0}',
-		SELECT_IN: 'select * from {0} where id in (?)',
+		SELECT_IN: 'select * from {0} where ?? in (?)',
 		INSERT: 'insert into ?? set ?',
-		DELETE: 'delete from ? where id=?',
-		DELETE_IN: 'delete from {0} where id in (?)',
-		UPDATE: 'update ?? set ? where id=?',
-		GETMODE: 'select * from ?? where id=?',
-		COUNT: 'select count({0}) as total from {1}'
+		DELETE: 'delete from ? where ??=?',
+		DELETE_IN: 'delete from ?? where ?? in (?)',
+		UPDATE: 'update ?? set ? where ??=?',
+		GETMODE: 'select * from ?? where ??=?',
+		COUNT: 'select count(?) as total from ??'
 	};
 
 
@@ -21,6 +22,8 @@ var DAO = function(config) {
 var daoPrototype = {
 	dbHelper: dbHelper,
 	pkField: 'id',
+	viewName: '',
+	tableName: '',
 	newUUID: function() {
 		return nodeUUID.v1();
 	},
@@ -67,6 +70,14 @@ var daoPrototype = {
 
 			runSql();
 		});
+	},
+	query: function(sql, callback) {
+		var conn = dbHelper.getConnection();
+		var query = conn.query(sql, [], function(err, ret) {
+			callback && callback(err, ret);
+		});
+
+		dbHelper.endConnection(conn, query);
 	},
 	getConditionStr: function(condition) {
 		if (!condition) {
@@ -120,8 +131,9 @@ var daoPrototype = {
 		}
 
 		var sql = [Util.format(SQL.SELECT, this.viewName || this.tableName)];
-		sql.push(this.getConditionStr(condition)),
-			sql.push(this.getOrderByStr(orderby));
+
+		sql.push(this.getConditionStr(condition));
+		sql.push(this.getOrderByStr(orderby));
 
 		var conn = dbHelper.getConnection(),
 			query = conn.query(sql.join(' '), callback);
@@ -144,10 +156,11 @@ var daoPrototype = {
 			callback = config;
 			config = {};
 		}
-		var conditionStr = this.getConditionStr(config.condition),
+		var tableName = this.viewName || this.tableName,
+			conditionStr = this.getConditionStr(config.condition),
 			orderbyStr = this.getOrderByStr(config.orderby),
-			countSql = Util.format(SQL.COUNT, this.viewName || this.tableName),
-			selectSql = Util.format(SQL.SELECT, this.viewName || this.tableName),
+			countSql = mysql.format(SQL.COUNT, [this.pkField, tableName]),
+			selectSql = Util.format(SQL.SELECT, tableName),
 			pageStr = '';
 
 		if (config.pageSize) {
@@ -181,14 +194,14 @@ var daoPrototype = {
 		// console.log(sqlList);
 	},
 	save: function(mode, callback) {
-		if (mode.id) {
+		if (mode[this.pkField]) {
 			this.edit(mode, callback);
 		} else {
 			this.add(mode, callback);
 		}
 	},
 	add: function(mode, callback) {
-		mode.id = nodeUUID.v1();
+		mode[this.pkField] = mode[this.pkField] || nodeUUID.v1();
 
 		var conn = dbHelper.getConnection(),
 			query = conn.query(SQL.INSERT, [this.tableName, mode], function(err, ret) {
@@ -207,7 +220,7 @@ var daoPrototype = {
 	},
 	edit: function(mode, callback) {
 		var conn = dbHelper.getConnection(),
-			query = conn.query(SQL.UPDATE, [this.tableName, mode, mode.id], function(err, ret) {
+			query = conn.query(SQL.UPDATE, [this.tableName, mode, this.pkField, mode[this.pkField]], function(err, ret) {
 				if (callback) {
 					if (err) {
 						callback(err, false);
@@ -223,8 +236,9 @@ var daoPrototype = {
 		//		console.log(query.sql);
 	},
 	getMode: function(id, callback) {
-		var conn = dbHelper.getConnection(),
-			query = conn.query(SQL.GETMODE, [this.viewName || this.tableName, id], function(err, ret) {
+		var tableName = this.viewName || this.tableName,
+			conn = dbHelper.getConnection(),
+			query = conn.query(SQL.GETMODE, [tableName, this.pkField, id], function(err, ret) {
 				if (callback) {
 					var mode = undefined;
 					if (!err && ret.length) {
@@ -238,9 +252,9 @@ var daoPrototype = {
 		// console.log(query.sql);
 	},
 	del: function(ids, callback) {
-		var sql = Util.format(SQL.DELETE_IN, this.tableName),
+		var sql = mysql.format(SQL.DELETE_IN, [this.tableName, this.pkField, ids.split(',')]),
 			conn = dbHelper.getConnection(),
-			query = conn.query(sql, [ids.split(',')], function(err, ret) {
+			query = conn.query(sql, function(err, ret) {
 				if (callback) {
 					if (err) {
 						callback(err, false);
@@ -250,8 +264,10 @@ var daoPrototype = {
 					}
 				}
 			});
+		console.log(sql);
+
 		dbHelper.endConnection(conn, query);
-		// console.log(query.sql);
+		console.log(query.sql);
 	},
 	getListIn: function(ids, callback) {
 		var sql = Util.format(SQL.SELECT_IN, this.tableName);
@@ -259,7 +275,7 @@ var daoPrototype = {
 			ids = ids.split(',');
 		}
 		var conn = dbHelper.getConnection(),
-			query = conn.query(sql, [ids], function(err, ret) {
+			query = conn.query(sql, [this.pkField, ids], function(err, ret) {
 				if (callback) {
 					if (err) {
 						callback(err);

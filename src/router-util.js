@@ -35,6 +35,29 @@ var helper = {
 	getReqId: function(req, res) {
 		return req.param('id');
 	},
+	getPageList: function(req, res, dao, callback) {
+		try {
+			var config = this.getReqMode(req, ['orderField', 'orderDir', 'pageSize', 'pageIndex']);
+			config.condition = req.condition; //这两项数据需要自行组织
+			config.orderby = {};
+			if (config.orderField) {
+				config.orderby[config.orderField] = config.orderDir || 'asc';
+			}
+			Util.apply(config.orderby, req.orderby);
+
+			dao.getPageList(config, function(err, rows, total) {
+				callback && callback(err, {
+					total: total,
+					rows: rows
+				});
+			});
+		} catch (err) {
+			callback && callback(err, {
+				total: 0,
+				rows: []
+			});
+		}
+	},
 	getList: function(req, res, dao) {
 		try {
 			var config = this.getReqMode(req, ['orderField', 'orderDir', 'pageSize', 'pageIndex']);
@@ -50,7 +73,7 @@ var helper = {
 					res.send(helper.resFail({
 						total: 0,
 						rows: []
-					}, 'getlist fail'));
+					}, err.message));
 				} else {
 					res.send(helper.resSucc({
 						total: total,
@@ -58,12 +81,12 @@ var helper = {
 					}));
 				}
 			});
-		} catch (e) {
+		} catch (err) {
+			console.log(e);
 			res.send(helper.resFail({
 				total: 0,
 				rows: []
-			}, 'getlist fail'));
-			console.log(e);
+			}, err.message));
 		}
 	},
 	getMode: function(req, res, dao) {
@@ -117,7 +140,12 @@ var helper = {
 			errorMsg: res.errorMsg,
 			successMsg: res.successMsg
 		});
-		res.render(page, pm);
+		try {
+			res.render(page, pm);
+
+		} catch (e) {
+			console.log(e.message);
+		}
 	}
 };
 
